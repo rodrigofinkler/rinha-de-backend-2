@@ -41,21 +41,21 @@ routes.get('/clientes/:id/extrato', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const sql_query = `
-      SELECT 
-        saldo as total,
-        NOW() as data_extrato,
-        limite 
-      FROM cliente WHERE id = ?;
+            SELECT 
+              saldo as total,
+              NOW() as data_extrato,
+              limite 
+            FROM cliente WHERE id = ?;
 
-      SELECT 
-        valor,
-        tipo,
-        descricao,
-        realizada_em
-      FROM transacao WHERE id_cliente = ?
-      ORDER BY realizada_em DESC
-      LIMIT 10
-      ;`;
+            SELECT 
+              valor,
+              tipo,
+              descricao,
+              realizada_em
+            FROM transacao WHERE id_cliente = ?
+            ORDER BY realizada_em DESC
+            LIMIT 10
+            ;`;
     const db = `rinha`;
     const sql_args = [id, id];
     const db_res = await DBClient.query<Array<any>>(
@@ -110,11 +110,12 @@ routes.post('/clientes/:id/transacoes', async (req: Request, res: Response) => {
 
     const db = `rinha`;
 
-    const client_data_query = `SELECT 
-                              saldo,
-                              NOW() as data_extrato,
-                              limite 
-                            FROM cliente WHERE id = ?;`;
+    const client_data_query = `
+                  SELECT 
+                    saldo,
+                    NOW() as data_extrato,
+                    limite 
+                  FROM cliente WHERE id = ?;`;
     const client_data_query_args = [id];
 
     const client_data_res = await DBClient.query<any>(
