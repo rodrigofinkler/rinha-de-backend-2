@@ -64,7 +64,6 @@ routes.get('/clientes/:id/extrato', async (req: Request, res: Response) => {
       sql_args,
       true
     );
-    console.log(db_res);
     if (db_res[0].length === 0) {
       return res.status(404).json({ 'err_message': 'Cliente não encontrado' });
     }
