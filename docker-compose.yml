@@ -10,6 +10,11 @@ services:
     expose:
       - "3306"
     network_mode: "host"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: "225MB"
 
   backend:
     build: .    
@@ -18,6 +23,11 @@ services:
     depends_on:
       - db    
     network_mode: "host"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: "225MB"
     
 
   
