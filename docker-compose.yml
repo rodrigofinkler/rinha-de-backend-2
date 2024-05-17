@@ -13,21 +13,21 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.75"
-          memory: "225MB"
+          cpus: "1.4"
+          memory: "350MB"
 
   backend:
     build: .    
     expose:
-      - "6969"
+      - "9999"
     depends_on:
       - db    
     network_mode: "host"
     deploy:
       resources:
         limits:
-          cpus: "0.75"
-          memory: "225MB"
+          cpus: "0.1"
+          memory: "200MB"
     
 
   
