@@ -8,7 +8,7 @@ class DatabaseClient {
     multipleStatements = false
   ): Promise<T> {
     const config: ConnectionConfig = {
-      host: `192.168.16.1`,
+      host: `localhost`,
       user: `root`,
       password: `pwd`,
       port: 3306,
