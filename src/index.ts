@@ -3,7 +3,7 @@ import express, { Router, Request, Response } from 'express';
 import { DBClient } from './database_client';
 
 const app = express();
-const port = 6969;
+const port = 9999;
 
 const routes = Router();
 
