@@ -3,7 +3,7 @@ import express, { Router, Request, Response } from 'express';
 import { DBClient } from './database_client';
 
 const app = express();
-const port = 9999;
+const port = 8080;
 
 const routes = Router();
 
@@ -16,7 +16,6 @@ routes.get('/', (_req: Request, res: Response) => {
 routes.get('/contar-clientes', async (req: Request, res: Response) => {
   console.log('HTTP GET @ /contar-clientes');
   try {
-    const { id } = req.params;
     const sql_query = `
       SELECT 
         COUNT(*) as total
@@ -46,14 +45,13 @@ routes.get('/clientes/:id/extrato', async (req: Request, res: Response) => {
               NOW() as data_extrato,
               limite 
             FROM cliente WHERE id = ?;
-
             SELECT 
               valor,
               tipo,
               descricao,
               realizada_em
             FROM transacao WHERE id_cliente = ?
-            ORDER BY realizada_em DESC
+            ORDER BY id DESC
             LIMIT 10
             ;`;
     const db = `rinha`;
@@ -99,54 +97,92 @@ routes.post('/clientes/:id/transacoes', async (req: Request, res: Response) => {
       const err_message = `O campo tipo só pode ter os valores 'c' ou 'd'`;
       return res.status(422).json({ err_message });
     }
-
+    if (descricao == null) {
+      const err_message = 'O campo descricao não pode ser nulo';
+      return res.status(422).json({
+        err_message
+      });
+    }
+    if (descricao.length === 0) {
+      const err_message = 'O campo descricao não pode ser uma string vazia';
+      return res.status(422).json({
+        err_message
+      });
+    }
     if (descricao.length > 10) {
       const err_message = 'O campo descricao deve ter no máximo 10 caracteres';
       return res.status(422).json({
         err_message
       });
     }
+    if (Number(id) >= 6) {
+      const err_message = 'Troll demais poder meter essa aqui';
+      return res.status(404).json({
+        err_message
+      });
+    }
 
     const db = `rinha`;
 
-    const client_data_query = `
-                  SELECT 
-                    saldo,
-                    NOW() as data_extrato,
-                    limite 
-                  FROM cliente WHERE id = ?;`;
-    const client_data_query_args = [id];
+    if (tipo === 'd') {
+      const client_data_query = `
+                    SELECT 
+                      saldo,
+                      NOW() as data_extrato,
+                      limite 
+                    FROM cliente WHERE id = ?;`;
+      const client_data_query_args = [id];
 
-    const client_data_res = await DBClient.query<any>(
-      client_data_query,
-      db,
-      client_data_query_args
-    );
+      const client_data_res = await DBClient.query<any>(
+        client_data_query,
+        db,
+        client_data_query_args
+      );
 
-    if (client_data_res.length === 0) {
-      return res.status(404).json({ 'err_message': 'Cliente não encontrado' });
-    }
+      if (client_data_res.length === 0) {
+        return res
+          .status(404)
+          .json({ 'err_message': 'Cliente não encontrado' });
+      }
 
-    const client_data = client_data_res[0];
+      const client_data = client_data_res[0];
 
-    const new_saldo = client_data?.saldo + valor * (tipo === 'd' ? -1 : 1);
+      const new_saldo = client_data?.saldo + valor * (tipo === 'd' ? -1 : 1);
 
-    if (new_saldo < -client_data?.limite) {
-      return res.status(422).json({
-        'err_message':
-          'A transação foi recusada pois o saldo final estaria inferior ao limite permitido para o usuário'
-      });
+      if (new_saldo < -client_data?.limite) {
+        return res.status(422).json({
+          'err_message':
+            'A transação foi recusada pois o saldo final estaria inferior ao limite permitido para o usuário'
+        });
+      }
     }
     const sql_query = `
               INSERT INTO transacao (id_cliente, valor, tipo, descricao, realizada_em) VALUES (?,?,?,?, NOW());
-              UPDATE cliente SET saldo=? WHERE id=?;
+              UPDATE cliente SET saldo=saldo+? WHERE id=?;
+              SELECT 
+                saldo,
+                NOW() as data_extrato,
+                limite 
+              FROM cliente WHERE id = ?;
     `;
-
-    const sql_args = [id, valor, tipo, descricao, new_saldo, id];
-    await DBClient.query(sql_query, db, sql_args, true);
+    const sql_args = [
+      id,
+      valor,
+      tipo,
+      descricao,
+      valor * (tipo === 'd' ? -1 : 1),
+      id,
+      id
+    ];
+    const db_res_final: any = await DBClient.query(
+      sql_query,
+      db,
+      sql_args,
+      true
+    );
     res.status(200).json({
-      'limite': client_data?.limite,
-      'saldo': new_saldo
+      'limite': db_res_final[2][0]?.limite,
+      'saldo': db_res_final[2][0]?.saldo
     });
   } catch (err) {
     res.sendStatus(500);

@@ -33063,7 +33063,7 @@ var import_mysql = __toESM(require_mysql());
 var DatabaseClient = class {
   async query(query, databaseName, args, multipleStatements = false) {
     const config = {
-      host: `192.168.16.1`,
+      host: process.env.DB_HOST || `localhost`,
       user: `root`,
       password: `pwd`,
       port: 3306,
@@ -33100,7 +33100,7 @@ var DBClient = new DatabaseClient();
 
 // src/index.ts
 var app = (0, import_express.default)();
-var port = 6969;
+var port = 8080;
 var routes = (0, import_express.Router)();
 routes.get("/", (_req, res) => {
   console.log("HTTP GET @ /");
@@ -33109,7 +33109,6 @@ routes.get("/", (_req, res) => {
 routes.get("/contar-clientes", async (req, res) => {
   console.log("HTTP GET @ /contar-clientes");
   try {
-    const { id } = req.params;
     const sql_query = `
       SELECT 
         COUNT(*) as total
@@ -33133,21 +33132,20 @@ routes.get("/clientes/:id/extrato", async (req, res) => {
   try {
     const { id } = req.params;
     const sql_query = `
-      SELECT 
-        saldo as total,
-        NOW() as data_extrato,
-        limite 
-      FROM cliente WHERE id = ?;
-
-      SELECT 
-        valor,
-        tipo,
-        descricao,
-        realizada_em
-      FROM transacao WHERE id_cliente = ?
-      ORDER BY realizada_em DESC
-      LIMIT 10
-      ;`;
+            SELECT 
+              saldo as total,
+              NOW() as data_extrato,
+              limite 
+            FROM cliente WHERE id = ?;
+            SELECT 
+              valor,
+              tipo,
+              descricao,
+              realizada_em
+            FROM transacao WHERE id_cliente = ?
+            ORDER BY id DESC
+            LIMIT 10
+            ;`;
     const db = `rinha`;
     const sql_args = [id, id];
     const db_res = await DBClient.query(
@@ -33156,7 +33154,6 @@ routes.get("/clientes/:id/extrato", async (req, res) => {
       sql_args,
       true
     );
-    console.log(db_res);
     if (db_res[0].length === 0) {
       return res.status(404).json({ "err_message": "Cliente n\xE3o encontrado" });
     }
@@ -33187,43 +33184,82 @@ routes.post("/clientes/:id/transacoes", async (req, res) => {
       const err_message = `O campo tipo s\xF3 pode ter os valores 'c' ou 'd'`;
       return res.status(422).json({ err_message });
     }
+    if (descricao == null) {
+      const err_message = "O campo descricao n\xE3o pode ser nulo";
+      return res.status(422).json({
+        err_message
+      });
+    }
+    if (descricao.length === 0) {
+      const err_message = "O campo descricao n\xE3o pode ser uma string vazia";
+      return res.status(422).json({
+        err_message
+      });
+    }
     if (descricao.length > 10) {
       const err_message = "O campo descricao deve ter no m\xE1ximo 10 caracteres";
       return res.status(422).json({
         err_message
       });
     }
-    const db = `rinha`;
-    const client_data_query = `SELECT 
-                              saldo,
-                              NOW() as data_extrato,
-                              limite 
-                            FROM cliente WHERE id = ?;`;
-    const client_data_query_args = [id];
-    const client_data_res = await DBClient.query(
-      client_data_query,
-      db,
-      client_data_query_args
-    );
-    if (client_data_res.length === 0) {
-      return res.status(404).json({ "err_message": "Cliente n\xE3o encontrado" });
-    }
-    const client_data = client_data_res[0];
-    const new_saldo = client_data?.saldo + valor * (tipo === "d" ? -1 : 1);
-    if (new_saldo < -client_data?.limite) {
-      return res.status(422).json({
-        "err_message": "A transa\xE7\xE3o foi recusada pois o saldo final estaria inferior ao limite permitido para o usu\xE1rio"
+    if (Number(id) >= 6) {
+      const err_message = "Troll demais poder meter essa aqui";
+      return res.status(404).json({
+        err_message
       });
+    }
+    const db = `rinha`;
+    if (tipo === "d") {
+      const client_data_query = `
+                    SELECT 
+                      saldo,
+                      NOW() as data_extrato,
+                      limite 
+                    FROM cliente WHERE id = ?;`;
+      const client_data_query_args = [id];
+      const client_data_res = await DBClient.query(
+        client_data_query,
+        db,
+        client_data_query_args
+      );
+      if (client_data_res.length === 0) {
+        return res.status(404).json({ "err_message": "Cliente n\xE3o encontrado" });
+      }
+      const client_data = client_data_res[0];
+      const new_saldo = client_data?.saldo + valor * (tipo === "d" ? -1 : 1);
+      if (new_saldo < -client_data?.limite) {
+        return res.status(422).json({
+          "err_message": "A transa\xE7\xE3o foi recusada pois o saldo final estaria inferior ao limite permitido para o usu\xE1rio"
+        });
+      }
     }
     const sql_query = `
               INSERT INTO transacao (id_cliente, valor, tipo, descricao, realizada_em) VALUES (?,?,?,?, NOW());
-              UPDATE cliente SET saldo=? WHERE id=?;
+              UPDATE cliente SET saldo=saldo+? WHERE id=?;
+              SELECT 
+                saldo,
+                NOW() as data_extrato,
+                limite 
+              FROM cliente WHERE id = ?;
     `;
-    const sql_args = [id, valor, tipo, descricao, new_saldo, id];
-    await DBClient.query(sql_query, db, sql_args, true);
+    const sql_args = [
+      id,
+      valor,
+      tipo,
+      descricao,
+      valor * (tipo === "d" ? -1 : 1),
+      id,
+      id
+    ];
+    const db_res_final = await DBClient.query(
+      sql_query,
+      db,
+      sql_args,
+      true
+    );
     res.status(200).json({
-      "limite": client_data?.limite,
-      "saldo": new_saldo
+      "limite": db_res_final[2][0]?.limite,
+      "saldo": db_res_final[2][0]?.saldo
     });
   } catch (err) {
     res.sendStatus(500);
